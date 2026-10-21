@@ -104,6 +104,12 @@ To tune the heuristics, edit `TYPE_TIERS`, `HEAVY_PATTERNS`, `TRIVIAL_PATTERNS` 
 - Requires Python 3.9+ on `PATH` (`sys.executable` at install time is recorded in settings).
 - **Windows:** works without Git Bash or WSL. The installer records the full `sys.executable` path (e.g. `C:\Python312\python.exe`) and writes the hook in exec form (`command` + `args`), so Claude Code spawns the interpreter directly with no shell in between. Run `--install` from the same Python you want the hook to use.
 
+### Known misroutes
+
+Prompts the heuristics get wrong, collected from the audit log. Add a `HEAVY_PATTERNS` / `TRIVIAL_PATTERNS` entry or use a `[model:...]` tag to work around each one.
+
+- _(none recorded yet — check `~/.claude/cheap_subagents.jsonl` for a `to: haiku` entry whose result came back thin and add it here)_
+
 ## Tests
 
 ```bash

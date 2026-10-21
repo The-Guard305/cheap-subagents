@@ -16,6 +16,9 @@ INSTALL (writes the hook into ~/.claude/settings.json, idempotent)
 UNINSTALL
   python3 cheap_subagents.py --uninstall [--project]
 
+VERSION
+  python3 cheap_subagents.py --version
+
 TEST A DECISION WITHOUT CLAUDE
   echo '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","prompt":"find auth code"}}' \
     | python3 cheap_subagents.py
@@ -44,6 +47,8 @@ import re
 import sys
 import time
 from pathlib import Path
+
+VERSION = "0.1.2"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Policy
@@ -263,7 +268,7 @@ def install(project: bool) -> None:
     pre[:] = [g for g in pre if not _is_ours(g)]
     pre.append(entry)
     sp.write_text(json.dumps(settings, indent=2) + "\n")
-    print(f"installed → {sp}\n  script: {script}\n  restart Claude Code (or /hooks to verify)")
+    print(f"installed cheap_subagents {VERSION} → {sp}\n  script: {script}\n  restart Claude Code (or /hooks to verify)")
 
 
 def uninstall(project: bool) -> None:
@@ -307,7 +312,9 @@ def stats() -> None:
 if __name__ == "__main__":
     args = sys.argv[1:]
     project = "--project" in args
-    if "--install" in args:
+    if "--version" in args:
+        print(VERSION)
+    elif "--install" in args:
         install(project)
     elif "--uninstall" in args:
         uninstall(project)
