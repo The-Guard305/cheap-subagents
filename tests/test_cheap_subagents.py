@@ -63,6 +63,10 @@ class DecisionTable(unittest.TestCase):
             self.assertIsNone(self.model_for("general-purpose", p), p)
             self.assertIsNone(self.model_for("Explore", p), p)  # heavy beats type
 
+    def test_review_and_critique_keep_parent(self):
+        self.assertIsNone(self.model_for("general-purpose", "review the diff in PR 42"))
+        self.assertIsNone(self.model_for("general-purpose", "critique this design doc"))
+
     def test_unknown_agent_type_scored_by_prompt(self):
         self.assertEqual(self.model_for("my-custom-reviewer", "find all usages of foo()"), "haiku")
         self.assertEqual(self.model_for("my-custom-reviewer", "rewrite the parser to support streaming"), "sonnet")

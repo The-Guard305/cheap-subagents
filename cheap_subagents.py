@@ -83,6 +83,8 @@ HEAVY_PATTERNS = [
     r"\bcomplex\b.*\breason",
     r"\bcareful(ly)? (reason|analy)",
     r"\bevaluate (multiple|several) (approaches|options)",
+    r"\breview\b",
+    r"\bcritique\b",
 ]
 
 # Prompt signals that the task is trivial — haiku territory.

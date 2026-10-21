@@ -66,7 +66,7 @@ Claude Code fires a `PreToolUse` hook before every tool call. A hook that prints
 replaces the tool's arguments. This script does exactly that for the `Agent` tool, adding a `model` field based on:
 
 1. **Escape-hatch tag** — `[model:opus|sonnet|haiku|keep]` in the prompt wins and is stripped before the subagent sees it.
-2. **Heavy signals** — regexes like `architect`, `trade-offs`, `root cause`, `security review`, `race condition` → leave `model` alone so the subagent inherits the parent.
+2. **Heavy signals** — regexes like `architect`, `trade-offs`, `root cause`, `review`, `critique`, `race condition` → leave `model` alone so the subagent inherits the parent.
 3. **Agent type** — `Explore`, `claude-code-guide`, `statusline-setup` → haiku. `general-purpose` → sonnet (drops to haiku if the prompt is short and looks like find/list/summarize). `Plan` → inherit.
 4. **Unknown/custom types** — scored by prompt: trivial → haiku, else sonnet.
 5. **Never upgrade** — if the parent already asked for something cheaper, keep it.
@@ -87,6 +87,15 @@ Environment variables (put them in your shell or in `settings.json` under `"env"
 
 To tune the heuristics, edit `TYPE_TIERS`, `HEAVY_PATTERNS`, `TRIVIAL_PATTERNS` at the top of the file. They're plain Python lists of regexes.
 
+## Pairs well with
+
+**Ralph-style fresh-process loops.** If you drive Claude Code from a shell loop that starts a new `claude -p` process per iteration (Ralph, `while :; do claude -p "$(cat PROMPT.md)"; done`, cron-driven agents, CI runners), the hook needs no per-iteration setup. `--install` writes it to `~/.claude/settings.json`, which is per-machine, so every fresh process on that machine inherits it. Points worth knowing:
+
+- The **parent** model is still whatever the loop passes with `--model` (or your default). The hook only touches subagents the parent spawns.
+- Each iteration's subagent fan-out gets routed the same way, so a loop that spawns a few `Explore` agents per pass stops paying the parent's rate for them.
+- The audit log in `~/.claude/cheap_subagents.jsonl` accumulates across iterations. `--stats` after a long run shows the haiku/sonnet/parent split for the whole loop.
+- For a loop pinned to one repo, `--install --project` scopes the hook to that repo's `.claude/settings.json` instead.
+
 ## Caveats
 
 - The hook emits `permissionDecision: "allow"` because that's what makes `updatedInput` take effect. `Agent` spawns don't prompt for permission anyway, so this changes nothing else — but it does mean the hook, not your permission rules, is the last word on `Agent` calls.
@@ -101,7 +110,7 @@ To tune the heuristics, edit `TYPE_TIERS`, `HEAVY_PATTERNS`, `TRIVIAL_PATTERNS` 
 python3 tests/test_cheap_subagents.py
 ```
 
-20 tests cover the decision table, the stdin/stdout hook contract, env overrides, log output, and installer idempotence.
+21 tests cover the decision table, the stdin/stdout hook contract, env overrides, log output, and installer idempotence.
 
 ## License
 
