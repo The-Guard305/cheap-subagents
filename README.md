@@ -1,5 +1,7 @@
 # cheap_subagents
 
+[![test](https://github.com/The-Guard305/cheap-subagents/actions/workflows/test.yml/badge.svg)](https://github.com/The-Guard305/cheap-subagents/actions/workflows/test.yml)
+
 **One file. No dependencies. Stops Claude Code from running every subagent on your most expensive model.**
 
 If you've hit the "your subagent use is heavy, try cheaper models" message — or you just watch your Opus budget evaporate on `Explore` agents that grep for a filename — this is the fix. It's a single Python `PreToolUse` hook that intercepts every `Agent` call and sets `model` to `haiku` or `sonnet` unless the task actually needs the big model.
@@ -11,10 +13,19 @@ Plan / "security review" / "root cause" / "trade-offs" →  untouched (inherits 
 [model:opus] anywhere in the prompt                    →  forced, tag stripped
 ```
 
+## Why not just set `model:` in agent frontmatter?
+
+Custom agents in `.claude/agents/*.md` can pin a model in their frontmatter, and if every subagent you spawn were one of those, you wouldn't need this. Two things get in the way:
+
+- **The built-in types have no frontmatter you can edit.** `Explore`, `general-purpose`, and `Plan` ship inside Claude Code. There's no file to add `model: haiku` to, and those are exactly the types that burn the most calls.
+- **The parent picks the type ad hoc.** The main session decides at call time whether a task is an `Explore`, a `general-purpose`, or an inline fork, and it rarely passes `model` unless prompted. Frontmatter only helps when the parent happens to choose an agent you've pre-configured.
+
+A `PreToolUse` hook sits underneath both of those: it sees every `Agent` call regardless of type and can set `model` on the way through. Frontmatter is still the right tool for a custom agent that should *always* run on a specific model; this hook handles everything else.
+
 ## Install
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/main/cheap_subagents.py
+curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/v0.1.0/cheap_subagents.py
 mkdir -p ~/.claude && mv cheap_subagents.py ~/.claude/
 python3 ~/.claude/cheap_subagents.py --install        # all projects (~/.claude/settings.json)
 # or:  --install --project                              # just this repo (.claude/settings.json)
@@ -25,6 +36,8 @@ Restart Claude Code. `/hooks` should list an `Agent` matcher pointing at the scr
 Uninstall: `python3 ~/.claude/cheap_subagents.py --uninstall`
 
 ## Proof it works
+
+<!-- TODO: replace the table below with the output of `python3 ~/.claude/cheap_subagents.py --stats` once there are a few days of real routing data. -->
 
 Run from a scratch project with the hook installed, Claude Code 2.1.305, `claude -p` asked to spawn one `Explore` subagent with no `model` parameter. Numbers are from Claude Code's own `modelUsage` accounting in `--output-format stream-json`:
 
@@ -80,6 +93,7 @@ To tune the heuristics, edit `TYPE_TIERS`, `HEAVY_PATTERNS`, `TRIVIAL_PATTERNS` 
 - Heuristics are heuristics. If a task gets routed to haiku and the result is thin, re-spawn with `[model:opus]` and consider adding a pattern to `HEAVY_PATTERNS`.
 - Hooks run inside subagents too. A subagent spawning its own subagent gets routed the same way.
 - Requires Python 3.9+ on `PATH` (`sys.executable` at install time is recorded in settings).
+- **Windows:** works without Git Bash or WSL. The installer records the full `sys.executable` path (e.g. `C:\Python312\python.exe`) and writes the hook in exec form (`command` + `args`), so Claude Code spawns the interpreter directly with no shell in between. Run `--install` from the same Python you want the hook to use.
 
 ## Tests
 
