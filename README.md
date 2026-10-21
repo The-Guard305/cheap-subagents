@@ -25,7 +25,7 @@ A `PreToolUse` hook sits underneath both of those: it sees every `Agent` call re
 ## Install
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/v0.1.0/cheap_subagents.py
+curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/v0.1.2/cheap_subagents.py
 mkdir -p ~/.claude && mv cheap_subagents.py ~/.claude/
 python3 ~/.claude/cheap_subagents.py --install        # all projects (~/.claude/settings.json)
 # or:  --install --project                              # just this repo (.claude/settings.json)
