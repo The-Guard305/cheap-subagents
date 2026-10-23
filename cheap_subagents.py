@@ -48,7 +48,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Policy
@@ -84,7 +84,8 @@ HEAVY_PATTERNS = [
     r"\bformal",
     r"\brefactor (the )?(entire|whole|core)\b",
     r"\bmigration plan\b",
-    r"\bconcurrency\b|\brace condition",
+    r"\bconcurrency\b",
+    r"\brace condition",
     r"\bcryptograph",
     r"\bcomplex\b.*\breason",
     r"\bcareful(ly)? (reason|analy)",
@@ -103,7 +104,7 @@ UNAMBIGUOUS_HEAVY = [
     r"\bsecurity (review|audit)\b",
     r"\bthreat model",
     r"\broot[- ]cause\b",
-    r"\bconcurrency\b|\brace condition",
+    r"\brace condition",
 ]
 
 # Prompt signals that the task is trivial — haiku territory.

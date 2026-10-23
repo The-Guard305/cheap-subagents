@@ -70,6 +70,7 @@ class DecisionTable(unittest.TestCase):
     def test_short_build_prompt_ignores_ambiguous_heavy(self):
         self.assertEqual(self.model_for("general-purpose", "Build Layer 1 HTTP probes and prove they work"), "sonnet")
         self.assertIsNone(self.model_for("general-purpose", "Build the auth module, then do a security review"))
+        self.assertEqual(self.model_for("general-purpose", "Build the worker pool with a concurrency limit of 5"), "sonnet")
 
     def test_review_pattern_is_specific(self):
         self.assertIsNone(self.model_for("general-purpose", "review the diff in PR 42"))

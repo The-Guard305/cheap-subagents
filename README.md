@@ -25,7 +25,7 @@ A `PreToolUse` hook sits underneath both of those: it sees every `Agent` call re
 ## Install
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/v0.1.3/cheap_subagents.py
+curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/v0.1.4/cheap_subagents.py
 mkdir -p ~/.claude && mv cheap_subagents.py ~/.claude/
 python3 ~/.claude/cheap_subagents.py --install        # all projects (~/.claude/settings.json)
 # or:  --install --project                              # just this repo (.claude/settings.json)
@@ -100,6 +100,7 @@ To tune the heuristics, edit `TYPE_TIERS`, `HEAVY_PATTERNS`, `TRIVIAL_PATTERNS` 
 
 - The hook emits `permissionDecision: "allow"` because that's what makes `updatedInput` take effect. `Agent` spawns don't prompt for permission anyway, so this changes nothing else — but it does mean the hook, not your permission rules, is the last word on `Agent` calls.
 - Heuristics are heuristics. If a task gets routed to haiku and the result is thin, re-spawn with `[model:opus]` and consider adding a pattern to `HEAVY_PATTERNS`.
+- Prompts that start with a build verb (`build/implement/add/create/write/fix/refactor`) and are under 1500 characters only check the unambiguous heavy set (`UNAMBIGUOUS_HEAVY`), so "write up a formal proof" routes to sonnet by design. Add `[model:opus]` if you need the parent model.
 - Hooks run inside subagents too. A subagent spawning its own subagent gets routed the same way.
 - Requires Python 3.9+ on `PATH` (`sys.executable` at install time is recorded in settings).
 - **Windows:** works without Git Bash or WSL. The installer records the full `sys.executable` path (e.g. `C:\Python312\python.exe`) and writes the hook in exec form (`command` + `args`), so Claude Code spawns the interpreter directly with no shell in between. Run `--install` from the same Python you want the hook to use.
