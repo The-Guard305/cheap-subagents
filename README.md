@@ -25,7 +25,7 @@ A `PreToolUse` hook sits underneath both of those: it sees every `Agent` call re
 ## Install
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/v0.1.2/cheap_subagents.py
+curl -fsSLO https://raw.githubusercontent.com/The-Guard305/cheap-subagents/v0.1.3/cheap_subagents.py
 mkdir -p ~/.claude && mv cheap_subagents.py ~/.claude/
 python3 ~/.claude/cheap_subagents.py --install        # all projects (~/.claude/settings.json)
 # or:  --install --project                              # just this repo (.claude/settings.json)
@@ -108,7 +108,10 @@ To tune the heuristics, edit `TYPE_TIERS`, `HEAVY_PATTERNS`, `TRIVIAL_PATTERNS` 
 
 Prompts the heuristics get wrong, collected from the audit log. Add a `HEAVY_PATTERNS` / `TRIVIAL_PATTERNS` entry or use a `[model:...]` tag to work around each one.
 
-- _(none recorded yet — check `~/.claude/cheap_subagents.jsonl` for a `to: haiku` entry whose result came back thin and add it here)_
+- **"Build Layer 1 HTTP probes and prove they work"** (general-purpose) was kept on the parent model because the bare `\bprove\b` pattern fired. Fixed in 0.1.3: `prove` now only counts as heavy as `formal proof` or `prove that/the … correct/safe/sound`, and short prompts that start with a build verb (`build|implement|add|create|write|fix|refactor`, under 1500 chars) only check the `UNAMBIGUOUS_HEAVY` subset. It now routes to sonnet.
+- **Any prompt containing "review"** (for example "update the review queue page") was kept on the parent model because of the bare `\breview\b` pattern. Fixed in 0.1.3: only `code/security/design/architecture review` and `review the/this pr/diff/patch/change` count. "Build the auth module, then do a security review" still keeps the parent, because security review is in the unambiguous subset.
+
+Each log entry has a `match` field holding the matched text with 30 characters of context on each side, so the log shows which phrase caused a misroute.
 
 ## Tests
 
@@ -116,7 +119,7 @@ Prompts the heuristics get wrong, collected from the audit log. Add a `HEAVY_PAT
 python3 tests/test_cheap_subagents.py
 ```
 
-21 tests cover the decision table, the stdin/stdout hook contract, env overrides, log output, and installer idempotence.
+25 tests cover the decision table, the stdin/stdout hook contract, env overrides, log output, and installer idempotence.
 
 ## License
 

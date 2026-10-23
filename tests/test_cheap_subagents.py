@@ -67,6 +67,19 @@ class DecisionTable(unittest.TestCase):
         self.assertIsNone(self.model_for("general-purpose", "review the diff in PR 42"))
         self.assertIsNone(self.model_for("general-purpose", "critique this design doc"))
 
+    def test_short_build_prompt_ignores_ambiguous_heavy(self):
+        self.assertEqual(self.model_for("general-purpose", "Build Layer 1 HTTP probes and prove they work"), "sonnet")
+        self.assertIsNone(self.model_for("general-purpose", "Build the auth module, then do a security review"))
+
+    def test_review_pattern_is_specific(self):
+        self.assertIsNone(self.model_for("general-purpose", "review the diff in PR 42"))
+        self.assertIsNone(self.model_for("general-purpose", "do a code review of client.py"))
+        self.assertEqual(self.model_for("general-purpose", "update the review queue page title"), "sonnet")
+
+    def test_prove_pattern_is_specific(self):
+        self.assertIsNone(self.model_for("general-purpose", "prove that the lock ordering is deadlock-free and correct"))
+        self.assertIsNone(self.model_for("general-purpose", "give a formal proof of the invariant"))
+
     def test_unknown_agent_type_scored_by_prompt(self):
         self.assertEqual(self.model_for("my-custom-reviewer", "find all usages of foo()"), "haiku")
         self.assertEqual(self.model_for("my-custom-reviewer", "rewrite the parser to support streaming"), "sonnet")
@@ -136,6 +149,17 @@ class HookContract(unittest.TestCase):
             rec = json.loads(logp.read_text().strip())
             self.assertEqual(rec["to"], "haiku")
             self.assertEqual(rec["subagent_type"], "Explore")
+            self.assertIsNone(rec["match"])  # Explore is type-tiered; no pattern fired
+
+    def test_log_match_has_context(self):
+        with tempfile.TemporaryDirectory() as d:
+            logp = Path(d) / "log.jsonl"
+            prompt = "please look over everything carefully and find the race condition in the worker pool scheduler code"
+            call({"subagent_type": "general-purpose", "prompt": prompt}, env={"CHEAP_SUBAGENTS_LOG": str(logp)})
+            rec = json.loads(logp.read_text().strip())
+            self.assertIsNone(rec["to"])
+            i = prompt.index("race condition")
+            self.assertEqual(rec["match"], prompt[i - 30:i + len("race condition") + 30])
 
 
 class Installer(unittest.TestCase):

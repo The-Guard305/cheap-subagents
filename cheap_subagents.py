@@ -48,7 +48,7 @@ import sys
 import time
 from pathlib import Path
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Policy
@@ -79,7 +79,8 @@ HEAVY_PATTERNS = [
     r"\broot[- ]cause\b",
     r"\bsecurity (review|audit)\b",
     r"\bthreat model",
-    r"\bprove\b|\bproof\b",
+    r"\bformal proof\b",
+    r"\bprove (that|the) .{0,40}(correct|safe|sound)",
     r"\bformal",
     r"\brefactor (the )?(entire|whole|core)\b",
     r"\bmigration plan\b",
@@ -88,8 +89,21 @@ HEAVY_PATTERNS = [
     r"\bcomplex\b.*\breason",
     r"\bcareful(ly)? (reason|analy)",
     r"\bevaluate (multiple|several) (approaches|options)",
-    r"\breview\b",
+    r"\b(code|security|design|architecture) review\b",
+    r"\breview (the|this) (pr|diff|patch|change)",
     r"\bcritique\b",
+]
+
+# Short "build X" prompts often mention review/proof words incidentally ("…and prove
+# they work"). For those, only these patterns are strong enough to keep the parent.
+BUILD_VERB_RE = r"^\s*(build|implement|add|create|write|fix|refactor)\b"
+BUILD_PROMPT_CHARS = 1500
+UNAMBIGUOUS_HEAVY = [
+    r"\barchitect",
+    r"\bsecurity (review|audit)\b",
+    r"\bthreat model",
+    r"\broot[- ]cause\b",
+    r"\bconcurrency\b|\brace condition",
 ]
 
 # Prompt signals that the task is trivial — haiku territory.
@@ -117,8 +131,28 @@ MODEL_RANK = {"haiku": 0, "sonnet": 1, "opus": 2, "fable": 3}
 TAG_RE = re.compile(r"\[model:(haiku|sonnet|opus|fable|keep)\]", re.I)
 
 
+def _first_match(patterns: list[str], text: str) -> tuple[str, re.Match] | None:
+    for pat in patterns:
+        m = re.search(pat, text)
+        if m:
+            return pat, m
+    return None
+
+
+def _context(m: re.Match | None, text: str, width: int = 30) -> str | None:
+    if m is None:
+        return None
+    return text[max(0, m.start() - width):m.end() + width]
+
+
 def decide(tool_input: dict) -> tuple[str | None, str, dict]:
     """Return (model_or_None, reason, updated_tool_input)."""
+    model, reason, updated, _match = decide_with_match(tool_input)
+    return model, reason, updated
+
+
+def decide_with_match(tool_input: dict) -> tuple[str | None, str, dict, str | None]:
+    """Like decide(), plus the matched text (with context) that drove the decision."""
     prompt: str = tool_input.get("prompt", "") or ""
     stype: str = tool_input.get("subagent_type", "") or ""
     explicit: str | None = tool_input.get("model")
@@ -129,49 +163,55 @@ def decide(tool_input: dict) -> tuple[str | None, str, dict]:
     if m:
         tag = m.group(1).lower()
         updated["prompt"] = TAG_RE.sub("", prompt).strip()
+        match = _context(m, prompt)
         if tag == "keep":
             updated.pop("model", None)
-            return None, "tag:keep", updated
+            return None, "tag:keep", updated, match
         updated["model"] = tag
-        return tag, f"tag:{tag}", updated
+        return tag, f"tag:{tag}", updated, match
 
     # 2. respect an explicit model from the parent if configured to
     if explicit and os.environ.get("CHEAP_SUBAGENTS_RESPECT_EXPLICIT", "0") == "1":
-        return explicit, "explicit:respected", updated
+        return explicit, "explicit:respected", updated, None
 
     low = prompt.lower()
 
-    # 3. heavy signals → keep parent model
-    for pat in HEAVY_PATTERNS:
-        if re.search(pat, low):
-            updated.pop("model", None)
-            return None, f"heavy:{pat}", updated
+    # 3. heavy signals → keep parent model (short build prompts: unambiguous ones only)
+    is_build = re.search(BUILD_VERB_RE, low) and len(prompt) < BUILD_PROMPT_CHARS
+    hit = _first_match(UNAMBIGUOUS_HEAVY if is_build else HEAVY_PATTERNS, low)
+    if hit:
+        pat, m = hit
+        updated.pop("model", None)
+        return None, f"heavy:{pat}", updated, _context(m, low)
 
     # 4. type-based tier
     if stype in TYPE_TIERS:
         tier = TYPE_TIERS[stype]
         if tier is None:
             updated.pop("model", None)
-            return None, f"type:{stype}:keep", updated
+            return None, f"type:{stype}:keep", updated, None
         # but trivial prompts on a MID type can still drop to CHEAP
-        if tier == MID and len(prompt) < 400 and any(re.search(p, low) for p in TRIVIAL_PATTERNS):
+        trivial = _first_match(TRIVIAL_PATTERNS, low) if tier == MID and len(prompt) < 400 else None
+        if trivial:
             tier = CHEAP
             reason = f"type:{stype}+trivial"
         else:
             reason = f"type:{stype}"
     else:
         # 5. unknown / custom agent type → score the prompt
-        if any(re.search(p, low) for p in TRIVIAL_PATTERNS) and len(prompt) < LONG_PROMPT_CHARS:
+        trivial = _first_match(TRIVIAL_PATTERNS, low) if len(prompt) < LONG_PROMPT_CHARS else None
+        if trivial:
             tier, reason = CHEAP, "prompt:trivial"
         else:
             tier, reason = MID, "prompt:default"
+    match = _context(trivial[1], low) if trivial else None
 
     # 6. never *upgrade* an explicit cheaper choice
     if explicit and MODEL_RANK.get(explicit, 9) < MODEL_RANK.get(tier, 9):
-        return explicit, f"explicit:cheaper({explicit})", updated
+        return explicit, f"explicit:cheaper({explicit})", updated, match
 
     updated["model"] = tier
-    return tier, reason, updated
+    return tier, reason, updated, match
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -203,7 +243,7 @@ def run_hook() -> int:
         return 0
 
     tool_input = data.get("tool_input") or {}
-    model, reason, updated = decide(tool_input)
+    model, reason, updated, match = decide_with_match(tool_input)
 
     log({
         "ts": int(time.time()),
@@ -212,6 +252,7 @@ def run_hook() -> int:
         "from": tool_input.get("model"),
         "to": model,
         "reason": reason,
+        "match": match,
         "desc": tool_input.get("description"),
     })
 
